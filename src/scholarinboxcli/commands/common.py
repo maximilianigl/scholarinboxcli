@@ -49,7 +49,11 @@ T = TypeVar("T")
 
 def with_client(no_retry: bool, action: Callable[[ScholarInboxClient], T]) -> T:
     """Run action with a managed client and standardized ApiError handling."""
-    client = ScholarInboxClient(no_retry=no_retry)
+    try:
+        client = ScholarInboxClient(no_retry=no_retry)
+    except ApiError as err:
+        handle_error(err)
+        raise  # unreachable, keeps type-checkers happy
     try:
         return action(client)
     except ApiError as err:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import os
+import sys
 
 import typer
 
@@ -13,28 +13,29 @@ from scholarinboxcli.formatters.domain_tables import format_auth_status
 app = typer.Typer(help="Authentication commands", no_args_is_help=True)
 
 
+def _read_secret() -> str:
+    # Read from a hidden prompt or a pipe so the secret stays out of shell history and argv.
+    if sys.stdin.isatty():
+        return typer.prompt("Magic login URL or sha_key", hide_input=True)
+    return sys.stdin.readline()
+
+
 @app.command("login")
 def auth_login(
-    url: str | None = typer.Option(None, "--url", help="Magic login URL with sha_key"),
-    sha_key: str | None = typer.Option(
-        None, "--sha-key", help="SHA key directly (requires SCHOLAR_INBOX_SHA_KEY env var or this flag)"
+    url: str | None = typer.Option(
+        None, "--url", help="Magic login URL with sha_key (omit to enter it at a hidden prompt or via stdin)"
     ),
 ):
-    if not url and not sha_key:
-        # Fall back to SCHOLAR_INBOX_SHA_KEY env var
-        sha_key = os.environ.get("SCHOLAR_INBOX_SHA_KEY")
-
-    if not url and not sha_key:
-        typer.echo("Provide --url, --sha-key, or set SCHOLAR_INBOX_SHA_KEY", err=True)
+    secret = (url or _read_secret()).strip()
+    if not secret:
+        typer.echo("No magic login URL or sha_key given", err=True)
         raise typer.Exit(1)
 
     def action(client):
-        if sha_key:
-            client.login_with_magic_link(
-                f"https://www.scholar-inbox.com/login?sha_key={sha_key}&date=01-01-2000"
-            )
+        if secret.startswith(("https://", "http://")):
+            client.login_with_magic_link(secret)
         else:
-            client.login_with_magic_link(url)
+            client.login_with_sha_key(secret)
         typer.echo("Login successful")
 
     with_client(False, action)

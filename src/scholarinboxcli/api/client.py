@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import time
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 from dataclasses import dataclass
 from http.cookiejar import Cookie
 from typing import Any
@@ -70,6 +70,20 @@ def _normalize_cookie_domains(cookies: httpx.Cookies, api_base: str) -> httpx.Co
     return cookies
 
 
+def _is_scholar_inbox_url(url: str) -> bool:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and (host == "scholar-inbox.com" or host.endswith(".scholar-inbox.com"))
+
+
+def _require_secure_api_base(api_base: str) -> None:
+    # Session cookies are sent to the API base, so never send them in plain text.
+    parsed = urlparse(api_base)
+    if parsed.scheme == "https" or parsed.hostname in ("localhost", "127.0.0.1", "::1"):
+        return
+    raise ApiError(f"Refusing insecure API base {api_base!r}; use https://")
+
+
 def _is_paper_list(data: Any) -> bool:
     if isinstance(data, dict):
         for key in ("papers", "results", "items", "data", "digest_df"):
@@ -114,6 +128,7 @@ class ScholarInboxClient:
         self.no_retry = no_retry
         self.cfg = load_config()
         self.api_base = api_base or os.environ.get("SCHOLAR_INBOX_API_BASE") or self.cfg.api_base
+        _require_secure_api_base(self.api_base)
         cookies = _cookies_from_list(self.cfg.cookies)
         self.client = httpx.Client(base_url=self.api_base, timeout=30.0, cookies=_normalize_cookie_domains(cookies, self.api_base))
 
@@ -125,6 +140,12 @@ class ScholarInboxClient:
         self.cfg.api_base = self.api_base
         save_config(self.cfg)
 
+    def login_with_sha_key(self, sha_key: str) -> None:
+        resp = self.client.get(ep.LOGIN_WITH_SHA_TEMPLATE.format(sha_key=quote(sha_key, safe="")))
+        if resp.status_code >= 400:
+            raise ApiError("Login failed", resp.status_code, resp.text)
+        self.save_cookies()
+
     def login_with_magic_link(self, login_url: str) -> None:
         sha_key = None
         try:
@@ -134,12 +155,11 @@ class ScholarInboxClient:
             sha_key = None
 
         if sha_key:
-            resp = self.client.get(ep.LOGIN_WITH_SHA_TEMPLATE.format(sha_key=sha_key))
-            if resp.status_code >= 400:
-                raise ApiError("Login failed", resp.status_code, resp.text)
-            self.save_cookies()
+            self.login_with_sha_key(sha_key)
             return
 
+        if not _is_scholar_inbox_url(login_url):
+            raise ApiError("Login URL must be an https://*.scholar-inbox.com link")
         with httpx.Client(follow_redirects=True, timeout=30.0) as client:
             resp = client.get(login_url)
             if resp.status_code >= 400:

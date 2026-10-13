@@ -17,21 +17,28 @@ uv pip install scholarinboxcli
 Or run directly with uvx (no install):
 
 ```bash
-uvx scholarinboxcli auth login --url "<magic-link-url>"
+uvx scholarinboxcli auth login
+```
+
+To install this fork (with `rate`), pin a reviewed commit rather than tracking the branch:
+
+```bash
+uv tool install "git+https://github.com/maximilianigl/scholarinboxcli.git@<commit>"
 ```
 
 ## Auth
 
+The `sha_key` in the magic link is a long-lived login credential. Anyone who has it can sign in as you.
+
 ```bash
-# Log in with the magic-link URL from the web app
-scholarinboxcli auth login --url "https://www.scholar-inbox.com/login?sha_key=...&date=MM-DD-YYYY"
-
-# Log in with sha_key directly (fork only)
-scholarinboxcli auth login --sha-key "YOUR_SHA_KEY"
-
-# Or set the env var — login without any flag needed (fork only)
-export SCHOLAR_INBOX_SHA_KEY="YOUR_SHA_KEY"
+# Paste the magic-link URL or the bare sha_key at a hidden prompt
 scholarinboxcli auth login
+
+# Or pipe it in, e.g. from the clipboard
+pbpaste | scholarinboxcli auth login
+
+# --url still works, but puts the key in shell history and the process list
+scholarinboxcli auth login --url "https://www.scholar-inbox.com/login?sha_key=...&date=MM-DD-YYYY"
 
 # Check current session and user info
 scholarinboxcli auth status
@@ -40,7 +47,7 @@ scholarinboxcli auth status
 scholarinboxcli auth logout
 ```
 
-Config is stored at `~/.config/scholarinboxcli/config.json`. You can override the API base with `SCHOLAR_INBOX_API_BASE`.
+The session is stored at `~/.config/scholarinboxcli/config.json` with owner-only permissions (`0600`). You can override the API base with `SCHOLAR_INBOX_API_BASE`; it must use `https://` (plain `http://` is allowed only for localhost).
 
 ## Command reference
 
@@ -134,8 +141,6 @@ scholarinboxcli search "transformers" --limit 5
 # Semantic similarity search
 scholarinboxcli semantic "graph neural networks" --limit 5
 ```
-
-## Other commands
 
 ## Rate Papers *(fork only)*
 

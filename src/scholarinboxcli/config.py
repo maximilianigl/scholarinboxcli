@@ -48,5 +48,12 @@ def load_config() -> Config:
 
 
 def save_config(cfg: Config) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(json.dumps(cfg.to_dict(), indent=2))
+    # The config holds session cookies, so keep it readable by the owner only.
+    CONFIG_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(CONFIG_DIR, 0o700)
+    tmp_path = CONFIG_PATH.with_suffix(".json.tmp")
+    fd = os.open(tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        os.fchmod(f.fileno(), 0o600)
+        f.write(json.dumps(cfg.to_dict(), indent=2))
+    os.replace(tmp_path, CONFIG_PATH)

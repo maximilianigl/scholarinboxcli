@@ -12,7 +12,7 @@ app = typer.Typer(
     help=(
         "Scholar Inbox CLI.\n\n"
         "Examples:\n"
-        "  scholarinboxcli auth login --url \"https://www.scholar-inbox.com/login?sha_key=...&date=MM-DD-YYYY\"\n"
+        "  scholarinboxcli auth login\n"
         "  scholarinboxcli digest --date 01-30-2026 --json\n"
         "  scholarinboxcli search \"transformers\" --limit 5 --json\n"
         "  scholarinboxcli collection papers \"AIAgents\" --json\n"
